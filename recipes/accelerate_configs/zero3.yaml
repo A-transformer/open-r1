@@ -2,18 +2,50 @@ compute_environment: LOCAL_MACHINE
 debug: false
 deepspeed_config:
   deepspeed_multinode_launcher: standard
-  offload_optimizer_device: none
-  offload_param_device: none
+  zero_stage: 3
   zero3_init_flag: true
   zero3_save_16bit_model: true
-  zero_stage: 3
+  offload_optimizer_device: cpu  # Offload optimizer to CPU to save GPU memory
+  offload_param_device: cpu  # If OOM persists, uncomment this to offload model params to CPU
+  train_micro_batch_size_per_gpu: 2  # Reduce batch size to avoid OOM
+  train_batch_size: 4  # Global batch size
+  fp16: false  # Since we're using bf16, fp16 should be disabled
+  bf16:
+    enabled: true  # Enable bf16 mixed precision
+  optimizer:
+    type: AdamW
+    params:
+      lr: 1e-6
+      betas: [0.9, 0.999]
+      eps: 1e-8
+  scheduler:
+    type: WarmupDecayLR
+    params:
+      warmup_min_lr: 0.0
+      warmup_max_lr: 1e-6
+      warmup_num_steps: 100
+  zero_optimization:
+    overlap_comm: true
+    contiguous_gradients: true
+    reduce_bucket_size: 5e8
+    stage3_max_live_parameters: 5e8
+    stage3_max_reuse_distance: 5e8
+    stage3_prefetch_bucket_size: 5e8
+    stage3_param_persistence_threshold: 1e6
+    memory_efficient_linear: true  # Reduce activation memory
+  aio:
+    block_size: 1048576
+    queue_depth: 8
+    thread_count: 1
+    single_submit: false
+    overlap_events: true
 distributed_type: DEEPSPEED
 downcast_bf16: 'no'
 machine_rank: 0
 main_training_function: main
 mixed_precision: bf16
 num_machines: 1
-num_processes: 8
+num_processes: 1
 rdzv_backend: static
 same_network: true
 tpu_env: []
